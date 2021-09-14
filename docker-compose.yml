@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+    db:
+        image: postgres
+        volumes:
+            - ./data/db:/var/lib/postgresql/data
+        ports:
+            - 5432:5432
+        environment:
+            - POSTGRES_DB=desafioli
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=e!8cWW^bx8BWX*Ye
+    django:
+        image: api-carrinho
+        ports:
+            - 8000:8000
+        volumes:
+            - .:/app/
+        depends_on:
+            - db
+    redis:
+        image: redis:5.0-alpine
+
