@@ -1,16 +1,15 @@
 import uuid
 from django.utils import timezone
-import json
 from .mock import Product, Customer
 from django.core.cache import cache
 from rest_framework import serializers
 from .models import Cart, CartItem
-from django.db import models
+
 
 
 class AddToCartSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
-    product_quantity = serializers.IntegerField(required=False, default=1, min_value=0, max_value=10000)
+    product_quantity = serializers.IntegerField(required=False, default=1, min_value=1, max_value=10000)
     customer_id = serializers.IntegerField(required=False)
     cart_id = serializers.UUIDField(required=False)
 
@@ -29,27 +28,22 @@ class AddToCartSerializer(serializers.Serializer):
             data['product_quantity'] = product['product_stock']
             data['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
         data['total_item'] = product['product_price'] * data['product_quantity']
-
         return data
 
     def validate_customer(self, data):
-
         customer = {}
         if not data.get('customer_id'):
             customer['customer_id'] = customer['customer_name'] = customer['customer_email'] = customer[
                 'customer_phone'] = customer['customer_gender'] = None
         else:
             cust = Customer().get_customer_by_id(data['customer_id'])
-
             if cust.get('message_warning'):
                 return cust
-
             customer['customer_id'] = cust['customer_id']
             customer['customer_name'] = cust['customer_name']
             customer['customer_email'] = cust['customer_email']
             customer['customer_phone'] = cust['customer_phone']
             customer['customer_gender'] = cust['customer_gender']
-
         return customer
 
     def add_item(self, data, prod, customer):
@@ -66,9 +60,7 @@ class AddToCartSerializer(serializers.Serializer):
             cart = generate_totals(cart)
             save_cache(cart)
             return cart
-
         elif cache.get(data.get('cart_id')):
-
             cart = cache.get(data.get('cart_id'))
             product_in_cache = False
             for item in cart['items']:
@@ -99,13 +91,12 @@ class RemoveItemSerializer(serializers.Serializer):
     def remove_item(self, data):
         if cache.get(data.get('cart_id')):
             cart = cache.get(data.get('cart_id'))
-            # return len(cart['items'])
             if len(cart['items']) == 1:
                 if cart['items'][0]['product_id'] == data['product_id']:
                     cache.delete(data['cart_id'])
                     return {'message_success': 'Item removed successfully.', 'cart': None}
                 else:
-                    cart['message_warning'] = f'{data["product_id"]} not found'
+                    cart['message_warning'] = f'product_id: {data["product_id"]} not found'
                     return cart
             for item in cart['items']:
                 if item['product_id'] == data['product_id']:
@@ -117,16 +108,40 @@ class RemoveItemSerializer(serializers.Serializer):
             return {'message_error': 'Cart not found.', 'cart': None}
 
 
+class QuantityUpdateSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    cart_id = serializers.UUIDField()
+    product_quantity = serializers.IntegerField(min_value=1, max_value=10000)
+
+    class Meta:
+        fields = ['product_id', 'cart_id', 'product_quantity']
+
+    def quantity_update(self, data):
+        if cache.get(data.get('cart_id')):
+            cart = cache.get(data.get('cart_id'))
+            for item in cart['items']:
+                if item['product_id'] == data['product_id']:
+                    item['product_quantity'] = data['product_quantity']
+                    if item['product_stock'] < data['product_quantity']:
+                        item['product_quantity'] = item['product_stock']
+                    item['total_item'] = item['product_quantity'] * item['product_price']
+                    cart = generate_totals(cart)
+                    save_cache(cart)
+                    return cart
+            cart['message_warning'] = f'product_id: {data["product_id"]} not found'
+            return cart
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
+
 def generate_totals(cart):
-    subtotal = 0
-    discount = 0
+    subtotal = discount = 0
     for item in cart['items']:
         subtotal += item['total_item']
     if cart.get('coupon_value'):
         discount = cart['coupon_value']
     cart['total'] = subtotal - discount
     cart['subtotal'] = subtotal
-
     return cart
 
 
