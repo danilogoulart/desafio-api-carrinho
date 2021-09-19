@@ -1,6 +1,6 @@
 class Product:
 
-    def get_product_by_id(product_id):
+    def get_product_by_id(self, product_id):
         product1 = {
             'product_id': 1,
             'product_name': 'Produto 1',
@@ -33,13 +33,13 @@ class Product:
         for product in products:
             if product_id == product['product_id']:
                 return product
-            else:
-                return {'message_error': 'Product not found'}
+        return {'message_error': 'Product not found'}
+
 
 
 class Customer:
     
-    def get_customer_by_id(customer_id):
+    def get_customer_by_id(self, customer_id):
         customer1 = {
             'customer_id': 1,
             'customer_name': 'Customer 1',
@@ -66,5 +66,4 @@ class Customer:
         for customer in customers:
             if customer_id == customer['customer_id']:
                 return customer
-            else:
-                return {'message_warning': 'Customer not found'}
+        return {'message_warning': 'Customer not found'}

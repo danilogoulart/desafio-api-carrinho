@@ -79,7 +79,7 @@ WSGI_APPLICATION = 'apicarrinho.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "desafioli",
+        "NAME": "postgres",
         "USER": "postgres",
         "PASSWORD": "e!8cWW^bx8BWX*Ye",
         "HOST": "db",
