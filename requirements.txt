@@ -1,4 +1,7 @@
 Django==3.2.7
 redis==3.5.3
+django-redis==5.0.0
 psycopg2-binary==2.9
 djangorestframework==3.12
+PyYAML==5.4.1
+drf-yasg==1.20
