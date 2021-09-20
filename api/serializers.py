@@ -1,6 +1,6 @@
 import uuid
 from django.utils import timezone
-from .mock import Product, Customer
+from .mock import Product, Customer, Coupon
 from django.core.cache import cache
 from rest_framework import serializers
 from .models import Cart, CartItem
@@ -54,7 +54,7 @@ class AddToCartSerializer(serializers.Serializer):
             prod['cart_id'] = cart['cart_id']
             cart['created_at'] = timezone.now()
             cart['updated_at'] = timezone.now()
-            cart['coupon_id'] = cart['coupon_value'] = None
+            cart['coupon_id'] = cart['coupon_percentage_value'] = None
             cart['abandoned'] = False
             cart['items'] = [prod]
             cart = generate_totals(cart)
@@ -133,14 +133,71 @@ class QuantityUpdateSerializer(serializers.Serializer):
         else:
             return {'message_error': 'Cart not found.', 'cart': None}
 
+class ClearCartSerializer(serializers.Serializer):
+    cart_id = serializers.UUIDField()
+
+    class Meta:
+        fields = ['cart_id']
+
+    def clear_cart(self, data):
+        if cache.get(data.get('cart_id')):
+            cache.delete(data['cart_id'])
+            return {'message_success': 'Cart successfully deleted'}
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
+
+class AddCouponSerializer(serializers.Serializer):
+    cart_id = serializers.UUIDField()
+    coupon_code = serializers.CharField()
+
+    class Meta:
+        fields = ['cart_id', 'coupon_code']
+
+    def add_coupon(self, data):
+        if cache.get(data.get('cart_id')):
+            cart = cache.get(data['cart_id'])
+            if cart['coupon_id']:
+                return {'message_error': 'Cart already has a discount coupon.'}
+            coupon = Coupon().get_coupons_by_code(data['coupon_code'])
+            if coupon.get('message_error'):
+                return coupon
+            cart['coupon_id'] = coupon['coupon_id']
+            cart['coupon_percentage_value'] = coupon['coupon_percentage_value']
+            cart['coupon_code'] = coupon['coupon_code']
+            cart = generate_totals(cart)
+            save_cache(cart)
+            return cart
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
+
+class RemoveCouponSerializer(serializers.Serializer):
+    cart_id = serializers.UUIDField()
+
+    class Meta:
+        fields = ['cart_id', 'coupon_code']
+
+    def remove_coupon(self, data):
+        if cache.get(data.get('cart_id')):
+            cart = cache.get(data['cart_id'])
+            cart['coupon_id'] = None
+            cart['coupon_percentage_value'] = None
+            cart['coupon_code'] = None
+            cart = generate_totals(cart)
+            save_cache(cart)
+            return cart
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
 
 def generate_totals(cart):
     subtotal = discount = 0
     for item in cart['items']:
         subtotal += item['total_item']
-    if cart.get('coupon_value'):
-        discount = cart['coupon_value']
-    cart['total'] = subtotal - discount
+    if cart.get('coupon_percentage_value'):
+        discount = cart['coupon_percentage_value']
+    cart['total'] = subtotal - (subtotal * discount/100)
     cart['subtotal'] = subtotal
     return cart
 

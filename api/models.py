@@ -22,7 +22,8 @@ class Cart(models.Model):
     )
     customer_gender = models.CharField(max_length=1, choices=GENDER_CHOICES,null=True,blank=True)
     coupon_id = models.PositiveIntegerField(null=True,blank=True)
-    coupon_value = models.FloatField(null=True,blank=True)
+    coupon_code = models.CharField(max_length=100, null=True, blank=True)
+    coupon_percentage_value = models.FloatField(null=True, blank=True)
     abandoned = models.BooleanField()
 
 

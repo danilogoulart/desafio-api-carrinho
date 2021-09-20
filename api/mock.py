@@ -36,9 +36,8 @@ class Product:
         return {'message_error': 'Product not found'}
 
 
-
 class Customer:
-    
+
     def get_customer_by_id(self, customer_id):
         customer1 = {
             'customer_id': 1,
@@ -67,3 +66,29 @@ class Customer:
             if customer_id == customer['customer_id']:
                 return customer
         return {'message_warning': 'Customer not found'}
+
+
+class Coupon:
+
+    def get_coupons_by_code(self, coupon_code):
+        coupon1 = {
+            'coupon_id': 1,
+            'coupon_code': 'coupon_1',
+            'coupon_percentage_value': 10
+        }
+        coupon2 = {
+            'coupon_id': 1,
+            'coupon_code': 'coupon_2',
+            'coupon_percentage_value': 20
+        }
+        coupon3 = {
+            'coupon_id': 1,
+            'coupon_code': 'coupon_3',
+            'coupon_percentage_value': 30
+        }
+        coupons = [coupon1, coupon2, coupon3]
+
+        for coupon in coupons:
+            if coupon_code == coupon['coupon_code']:
+                return coupon
+        return {'message_error': 'Coupon not found'}
