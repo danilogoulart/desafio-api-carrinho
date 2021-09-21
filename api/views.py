@@ -1,6 +1,6 @@
 from django.core.cache import cache
 from rest_framework.decorators import api_view
-from .serializers import AddToCartSerializer, RemoveItemSerializer, QuantityUpdateSerializer, ClearCartSerializer, AddCouponSerializer, RemoveCouponSerializer
+from .serializers import AddToCartSerializer, RemoveItemSerializer, QuantityUpdateSerializer, CleanCartSerializer, AddCouponSerializer, RemoveCouponSerializer, CartSerializer
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -52,9 +52,9 @@ def quantity_update(request):
 @api_view(['DELETE'])
 def clean_cart(request):
     if request.method == 'DELETE':
-        serializer = ClearCartSerializer(data=request.data)
+        serializer = CleanCartSerializer(data=request.data)
         if serializer.is_valid():
-            serializer = serializer.clear_cart(serializer.data)
+            serializer = serializer.clean_cart(serializer.data)
             if serializer.get('message_error'):
                 return Response(serializer, status.HTTP_400_BAD_REQUEST)
             return Response(serializer, status=status.HTTP_200_OK)
@@ -83,3 +83,13 @@ def coupon(request):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['POST'])
+def save_cart(request):
+    if request.method == 'POST':
+        serializer = CartSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer = serializer.create(serializer.data)
+            return Response(serializer, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -4,7 +4,7 @@ class Product:
         product1 = {
             'product_id': 1,
             'product_name': 'Produto 1',
-            'produtc_active': True,
+            'product_active': True,
             'product_sku': 1,
             'product_price': 10,
             'product_img': 'https://www.teste.com.br/img.png',
@@ -13,7 +13,7 @@ class Product:
         product2 = {
             'product_id': 2,
             'product_name': 'Produto 2',
-            'produtc_active': True,
+            'product_active': True,
             'product_sku': 2,
             'product_price': 20,
             'product_img': 'https://www.teste.com.br/img2.png',
@@ -22,7 +22,7 @@ class Product:
         product3 = {
             'product_id': 3,
             'product_name': 'Produto 3',
-            'produtc_active': True,
+            'product_active': True,
             'product_sku': 3,
             'product_price': 30,
             'product_img': 'https://www.teste.com.br/img3.png',
@@ -44,21 +44,21 @@ class Customer:
             'customer_name': 'Customer 1',
             'customer_email': 'customer1@customer.com',
             'customer_phone': '21911111111',
-            'customer_gender': 'M'
+            'customer_gender': 'Male'
         }
         customer2 = {
             'customer_id': 2,
             'customer_name': 'Customer 2',
             'customer_email': 'customer2@customer.com',
             'customer_phone': '21922222222',
-            'customer_gender': 'F'
+            'customer_gender': 'Female'
         }
         customer3 = {
             'customer_id': 3,
             'customer_name': 'Customer 3',
             'customer_email': 'customer3@customer.com',
             'customer_phone': '21933333333',
-            'customer_gender': 'F'
+            'customer_gender': 'Female'
         }
         customers = [customer1, customer2, customer3]
 

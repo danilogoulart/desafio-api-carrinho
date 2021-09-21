@@ -24,7 +24,6 @@ class Cart(models.Model):
     coupon_id = models.PositiveIntegerField(null=True,blank=True)
     coupon_code = models.CharField(max_length=100, null=True, blank=True)
     coupon_percentage_value = models.FloatField(null=True, blank=True)
-    abandoned = models.BooleanField()
 
 
 class CartItem(models.Model):
@@ -32,6 +31,7 @@ class CartItem(models.Model):
     product_id = models.PositiveIntegerField(blank=False, null=False)
     product_name = models.CharField(max_length=255, blank=False, null=False)
     product_sku = models.CharField(max_length=255, blank=False, null=False)
+    product_active = models.BooleanField(blank=False, null=False)
     product_img = models.URLField(max_length=255)
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product_price = models.FloatField(blank=False, null=False)

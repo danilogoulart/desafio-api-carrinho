@@ -70,6 +70,7 @@ class AddToCartSerializer(serializers.Serializer):
                         item['product_quantity'] = prod['product_stock']
                     item['total_item'] = item['product_quantity'] * item['product_price']
                     product_in_cache = True
+            prod['cart_id'] = cart['cart_id']
             if not product_in_cache:
                 if cart['items']:
                     cart['items'].append(prod)
@@ -133,13 +134,13 @@ class QuantityUpdateSerializer(serializers.Serializer):
         else:
             return {'message_error': 'Cart not found.', 'cart': None}
 
-class ClearCartSerializer(serializers.Serializer):
+class CleanCartSerializer(serializers.Serializer):
     cart_id = serializers.UUIDField()
 
     class Meta:
         fields = ['cart_id']
 
-    def clear_cart(self, data):
+    def clean_cart(self, data):
         if cache.get(data.get('cart_id')):
             cache.delete(data['cart_id'])
             return {'message_success': 'Cart successfully deleted'}
@@ -190,6 +191,27 @@ class RemoveCouponSerializer(serializers.Serializer):
         else:
             return {'message_error': 'Cart not found.', 'cart': None}
 
+class CartItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        Model = CartItem
+        fields = '__all__'
+
+class CartSerializer(serializers.ModelSerializer):
+    cart_id = serializers.UUIDField()
+
+    class Meta:
+        model = Cart
+        fields = ['cart_id']
+
+    def create(self, data):
+        if cache.get(data['cart_id']):
+            cart = cache.get(data['cart_id'])
+            items = cart.pop('items')
+            Cart.objects.create(**cart)
+            for item in items:
+                CartItem.objects.create(**item)
+            cache.delete(data['cart_id'])
+            return {"message_success": "Cart successfully persisted."}
 
 def generate_totals(cart):
     subtotal = discount = 0
