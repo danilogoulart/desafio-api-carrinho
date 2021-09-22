@@ -1,6 +1,6 @@
 import uuid
 from django.utils import timezone
-import json
+import copy
 
 from .mock import Product, Customer, Coupon
 from django.core.cache import cache
@@ -45,7 +45,6 @@ class AddToCartSerializer(serializers.Serializer):
             cart['updated_at'] = timezone.now()
             cart['coupon_id'] = cart['coupon_percentage_value'] = None
             cart['items'] = [prod]
-            cart = generate_totals(cart)
             save_cache(cart)
             return cart
         elif cache.get(data.get('cart_id')):
@@ -64,7 +63,6 @@ class AddToCartSerializer(serializers.Serializer):
                     cart['items'].append(prod)
                 else:
                     cart['items'][0] = prod
-            cart = generate_totals(cart)
             save_cache(cart)
             return cart
 
@@ -89,7 +87,6 @@ class RemoveItemSerializer(serializers.Serializer):
             for item in cart['items']:
                 if item['product_id'] == data['product_id']:
                     cart['items'].remove(item)
-                    cart = generate_totals(cart)
                     save_cache(cart)
                     return cart
         else:
@@ -113,7 +110,6 @@ class QuantityUpdateSerializer(serializers.Serializer):
                     if item['product_stock'] < data['product_quantity']:
                         item['product_quantity'] = item['product_stock']
                     item['total_item'] = item['product_quantity'] * item['product_price']
-                    cart = generate_totals(cart)
                     save_cache(cart)
                     return cart
             cart['message_warning'] = f'product_id: {data["product_id"]} not found'
@@ -140,7 +136,6 @@ class AddCouponSerializer(serializers.Serializer):
             cart['coupon_id'] = coupon['coupon_id']
             cart['coupon_percentage_value'] = coupon['coupon_percentage_value']
             cart['coupon_code'] = coupon['coupon_code']
-            cart = generate_totals(cart)
             save_cache(cart)
             return cart
         else:
@@ -159,7 +154,6 @@ class RemoveCouponSerializer(serializers.Serializer):
             cart['coupon_id'] = None
             cart['coupon_percentage_value'] = None
             cart['coupon_code'] = None
-            cart = generate_totals(cart)
             save_cache(cart)
             return cart
         else:
@@ -196,6 +190,9 @@ class CartSerializer(serializers.ModelSerializer):
                 CartItem.objects.create(**item)
             cache.delete(data['cart_id'])
             return {"message_success": "Cart successfully persisted."}
+        else:
+            raise serializers.ValidationError({"message_error": "Cart not found."})
+
 
 class RetrieveCartItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -210,48 +207,57 @@ class RetrieveCartSerializer(serializers.ModelSerializer):
 
     def validate_cart(self, data):
         data['cart_id'] = str(uuid.uuid4())
-        data['items'] = validate_product(data)['items']
+        data = validate_product(data)
         save_cache(data)
         return data
 
 
 def validate_product(items, add_to_cart=False):
+
     if add_to_cart:
         product = Product().get_product_by_id(items['product_id'])
         if product.get('message_error'):
-            raise serializers.ValidationError(product, code=404)
+            raise serializers.ValidationError(product)
         product['product_quantity'] = items['product_quantity']
         if product['product_stock'] < 1:
-            raise serializers.ValidationError({'message_error': 'The product is out of stock.'}, code=404)
+            raise serializers.ValidationError({'message_error': 'The product is out of stock.'})
         if not product['product_active']:
-            raise serializers.ValidationError({'message_error': 'The product is not available.'}, code=404)
+            raise serializers.ValidationError({'message_error': 'The product is not available.'})
         if product['product_stock'] < items['product_quantity']:
             product['product_quantity'] = product['product_stock']
             product['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
         product['total_item'] = product['product_price'] * product['product_quantity']
         return product
-    message = {}
-    data = {'items': []}
-    for item in items['items']:
+
+    message = {'message_warning': {}}
+    products = items['items']
+    items['items'] = []
+    for item in products:
         product = Product().get_product_by_id(item['product_id'])
         if product.get('message_error'):
-            message['message_warning'][item['product_id']] = 'Product not found.'
             continue
+
         product['product_quantity'] = item['product_quantity']
+
         if product['product_stock'] < 1:
             message['message_warning'][item['product_id']] = 'The product is out of stock.'
             continue
+
         if not product['product_active']:
             message['message_warning'][item['product_id']] = 'The product is not available.'
             continue
+
         if product['product_stock'] < item['product_quantity']:
             product['product_quantity'] = product['product_stock']
             product['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
         product['total_item'] = product['product_price'] * product['product_quantity']
         product['cart_id'] = items['cart_id']
-        data['items'].append(product)
-    data['message'] = message
-    return data
+        items['items'].append(product)
+    items['message'] = message
+
+    if items['items']:
+        return items
+    raise serializers.ValidationError({'message_error': 'The cart has no products available.'})
 
 
 
@@ -267,6 +273,10 @@ def generate_totals(cart):
 
 
 def save_cache(cart):
-    cart['items'][0].pop('message_warning', None)
+    cart = generate_totals(cart)
     cart['updated_at'] = timezone.now()
-    cache.set(cart['cart_id'], cart, 60 * 60 * 24 * 5)
+    cart_cache = copy.deepcopy(cart)
+    for item in cart_cache['items']:
+        item.pop('message_warning', None)
+    cart_cache.pop('message_warning', None)
+    cache.set(cart_cache['cart_id'], cart_cache, 60 * 60 * 24 * 5)

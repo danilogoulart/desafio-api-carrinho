@@ -103,7 +103,7 @@ def save_cart(request):
     if request.method == 'POST':
         serializer = CartSerializer(data=request.data)
         if serializer.is_valid():
-            serializer = serializer.save()
+            serializer = serializer.create(serializer.data)
             return Response(serializer, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
