@@ -44,21 +44,21 @@ class Customer:
             'customer_name': 'Customer 1',
             'customer_email': 'customer1@customer.com',
             'customer_phone': '21911111111',
-            'customer_gender': 'Male'
+            'customer_gender': 'M'
         }
         customer2 = {
             'customer_id': 2,
             'customer_name': 'Customer 2',
             'customer_email': 'customer2@customer.com',
             'customer_phone': '21922222222',
-            'customer_gender': 'Female'
+            'customer_gender': 'F'
         }
         customer3 = {
             'customer_id': 3,
             'customer_name': 'Customer 3',
             'customer_email': 'customer3@customer.com',
             'customer_phone': '21933333333',
-            'customer_gender': 'Female'
+            'customer_gender': 'F'
         }
         customers = [customer1, customer2, customer3]
 
