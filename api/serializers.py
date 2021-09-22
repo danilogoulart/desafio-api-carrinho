@@ -279,4 +279,5 @@ def save_cache(cart):
     for item in cart_cache['items']:
         item.pop('message_warning', None)
     cart_cache.pop('message_warning', None)
+    cart_cache.pop('message', None)
     cache.set(cart_cache['cart_id'], cart_cache, 60 * 60 * 24 * 5)
