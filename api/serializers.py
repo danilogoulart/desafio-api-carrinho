@@ -1,5 +1,7 @@
 import uuid
 from django.utils import timezone
+import json
+
 from .mock import Product, Customer, Coupon
 from django.core.cache import cache
 from rest_framework import serializers
@@ -15,20 +17,6 @@ class AddToCartSerializer(serializers.Serializer):
 
     class Meta:
         fields = ['product_id', 'product_quantity', 'customer_id', 'cart_id']
-
-    def validate_product(self, item):
-        product = Product().get_product_by_id(item['product_id'])
-        if product.get('message_error'):
-            return product
-        data = product
-        data['product_quantity'] = item['product_quantity']
-        if product['product_stock'] < 1:
-            return {'message_error': 'The product is out of stock.'}
-        if product['product_stock'] < item['product_quantity']:
-            data['product_quantity'] = product['product_stock']
-            data['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
-        data['total_item'] = product['product_price'] * data['product_quantity']
-        return data
 
     def validate_customer(self, data):
         customer = {}
@@ -46,8 +34,9 @@ class AddToCartSerializer(serializers.Serializer):
             customer['customer_gender'] = cust['customer_gender']
         return customer
 
-    def add_item(self, data, prod, customer):
+    def add_item(self, data, customer):
         cart = {}
+        prod = validate_product(data, True)
         cart = dict(cart, **customer)
         if not data.get('cart_id'):
             cart['cart_id'] = str(uuid.uuid4())
@@ -55,7 +44,6 @@ class AddToCartSerializer(serializers.Serializer):
             cart['created_at'] = timezone.now()
             cart['updated_at'] = timezone.now()
             cart['coupon_id'] = cart['coupon_percentage_value'] = None
-            cart['abandoned'] = False
             cart['items'] = [prod]
             cart = generate_totals(cart)
             save_cache(cart)
@@ -76,7 +64,6 @@ class AddToCartSerializer(serializers.Serializer):
                     cart['items'].append(prod)
                 else:
                     cart['items'][0] = prod
-            cart['updated_at'] = timezone.now()
             cart = generate_totals(cart)
             save_cache(cart)
             return cart
@@ -134,19 +121,6 @@ class QuantityUpdateSerializer(serializers.Serializer):
         else:
             return {'message_error': 'Cart not found.', 'cart': None}
 
-class CleanCartSerializer(serializers.Serializer):
-    cart_id = serializers.UUIDField()
-
-    class Meta:
-        fields = ['cart_id']
-
-    def clean_cart(self, data):
-        if cache.get(data.get('cart_id')):
-            cache.delete(data['cart_id'])
-            return {'message_success': 'Cart successfully deleted'}
-        else:
-            return {'message_error': 'Cart not found.', 'cart': None}
-
 
 class AddCouponSerializer(serializers.Serializer):
     cart_id = serializers.UUIDField()
@@ -177,7 +151,7 @@ class RemoveCouponSerializer(serializers.Serializer):
     cart_id = serializers.UUIDField()
 
     class Meta:
-        fields = ['cart_id', 'coupon_code']
+        fields = ['cart_id']
 
     def remove_coupon(self, data):
         if cache.get(data.get('cart_id')):
@@ -191,10 +165,6 @@ class RemoveCouponSerializer(serializers.Serializer):
         else:
             return {'message_error': 'Cart not found.', 'cart': None}
 
-class CartItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        Model = CartItem
-        fields = '__all__'
 
 class CartSerializer(serializers.ModelSerializer):
     cart_id = serializers.UUIDField()
@@ -203,15 +173,87 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = ['cart_id']
 
+    def clean_cart(self, data):
+        if cache.get(data.get('cart_id')):
+            cache.delete(data['cart_id'])
+            return {'message_success': 'Cart successfully deleted'}
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
+    def get_cart_by_id(self, data):
+        if cache.get(data.get('cart_id')):
+            return cache.get(data['cart_id'])
+        else:
+            return {'message_error': 'Cart not found.', 'cart': None}
+
     def create(self, data):
         if cache.get(data['cart_id']):
             cart = cache.get(data['cart_id'])
             items = cart.pop('items')
             Cart.objects.create(**cart)
             for item in items:
+                item.pop('product_stock')
                 CartItem.objects.create(**item)
             cache.delete(data['cart_id'])
             return {"message_success": "Cart successfully persisted."}
+
+class RetrieveCartItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CartItem
+        fields = '__all__'
+
+class RetrieveCartSerializer(serializers.ModelSerializer):
+    items = RetrieveCartItemSerializer(many=True)
+    class Meta:
+        model = Cart
+        fields = '__all__'
+
+    def validate_cart(self, data):
+        data['cart_id'] = str(uuid.uuid4())
+        data['items'] = validate_product(data)['items']
+        save_cache(data)
+        return data
+
+
+def validate_product(items, add_to_cart=False):
+    if add_to_cart:
+        product = Product().get_product_by_id(items['product_id'])
+        if product.get('message_error'):
+            raise serializers.ValidationError(product, code=404)
+        product['product_quantity'] = items['product_quantity']
+        if product['product_stock'] < 1:
+            raise serializers.ValidationError({'message_error': 'The product is out of stock.'}, code=404)
+        if not product['product_active']:
+            raise serializers.ValidationError({'message_error': 'The product is not available.'}, code=404)
+        if product['product_stock'] < items['product_quantity']:
+            product['product_quantity'] = product['product_stock']
+            product['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
+        product['total_item'] = product['product_price'] * product['product_quantity']
+        return product
+    message = {}
+    data = {'items': []}
+    for item in items['items']:
+        product = Product().get_product_by_id(item['product_id'])
+        if product.get('message_error'):
+            message['message_warning'][item['product_id']] = 'Product not found.'
+            continue
+        product['product_quantity'] = item['product_quantity']
+        if product['product_stock'] < 1:
+            message['message_warning'][item['product_id']] = 'The product is out of stock.'
+            continue
+        if not product['product_active']:
+            message['message_warning'][item['product_id']] = 'The product is not available.'
+            continue
+        if product['product_stock'] < item['product_quantity']:
+            product['product_quantity'] = product['product_stock']
+            product['message_warning'] = f'The product only has {product["product_stock"]} quantities in stock'
+        product['total_item'] = product['product_price'] * product['product_quantity']
+        product['cart_id'] = items['cart_id']
+        data['items'].append(product)
+    data['message'] = message
+    return data
+
+
 
 def generate_totals(cart):
     subtotal = discount = 0
@@ -226,4 +268,5 @@ def generate_totals(cart):
 
 def save_cache(cart):
     cart['items'][0].pop('message_warning', None)
+    cart['updated_at'] = timezone.now()
     cache.set(cart['cart_id'], cart, 60 * 60 * 24 * 5)

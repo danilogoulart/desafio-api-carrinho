@@ -28,7 +28,16 @@ class Product:
             'product_img': 'https://www.teste.com.br/img3.png',
             'product_stock': 30
         }
-        products = [product1, product2, product3]
+        product4 = {
+            'product_id': 4,
+            'product_name': 'Produto 4',
+            'product_active': True,
+            'product_sku': 4,
+            'product_price': 40,
+            'product_img': 'https://www.teste.com.br/img3.png',
+            'product_stock': 40
+        }
+        products = [product1, product2, product3, product4]
 
         for product in products:
             if product_id == product['product_id']:
